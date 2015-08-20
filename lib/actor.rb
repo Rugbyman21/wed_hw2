@@ -1,60 +1,45 @@
-require("spec_helper")
+class Actor
+  attr_reader(:name, :id)
 
-describe(Actor) do
-
-  describe("#initialize") do
-    it("is initialized with a name") do
-      actor = Actor.new({:name => "Brad Pitt", :id => nil})
-      expect(actor).to(be_an_instance_of(Actor))
-    end
-
-    it("can be initialized with its database ID") do
-      actor = Actor.new({:name => "Brad Pitt", :id => 1})
-      expect(actor).to(be_an_instance_of(Actor))
-    end
+  define_method(:initialize) do |attributes|
+    @name = attributes.fetch(:name)
+    @id = attributes.fetch(:id)
   end
 
-  describe(".all") do
-    it("starts off with no movies") do
-      expect(Actor.all()).to(eq([]))
+  define_singleton_method(:all) do
+    returned_actors = DB.exec("SELECT * FROM actors;")
+    actors = []
+    returned_actors.each() do |actor|
+      name = actor.fetch("name")
+      id = actor.fetch("id").to_i()
+      actors.push(Actor.new({:name => name, :id => id}))
     end
+    actors
   end
 
-  describe(".find") do
-    it("returns a actor by its ID number") do
-      test_actor = Actor.new({:name => "Brad Pitt", :id => nil})
-      test_actor.save()
-      test_actor2 = Actor.new({:name => "George Clooney", :id => nil})
-      test_actor2.save()
-      expect(Actor.find(test_actor2.id())).to(eq(test_actor2))
-    end
+  define_singleton_method(:find) do |id|
+    result = DB.exec("SELECT * FROM actors WHERE id = #{id};")
+    name = result.first().fetch("name")
+    Actor.new({:name => name, :id => id})
   end
 
-  describe("#==") do
-    it("is the same actor if it has the same name and id") do
-      actor = Actor.new({:name => "Brad Pitt", :id => nil})
-      actor2 = Actor.new({:name => "Brad Pitt", :id => nil})
-      expect(actor).to(eq(actor2))
-    end
+
+  define_method(:save) do
+    result = DB.exec("INSERT INTO actors (name) VALUES ('#{@name}') RETURNING id;")
+    @id = result.first().fetch("id").to_i()
   end
 
-  describe("#update") do
-    it("lets you update actors in the database") do
-      actor = Actor.new({:name => "George Clooney", :id => nil})
-      actor.save()
-      actor.update({:name => "Brad Pitt"})
-      expect(actor.name()).to(eq("Brad Pitt"))
-    end
+  define_method(:==) do |another_actor|
+    self.name().==(another_actor.name()).&(self.id().==(another_actor.id()))
   end
 
-  describe("#delete") do
-    it("lets you delete an actor from the database") do
-      actor = Actor.new({:name => "George Clooney", :id => nil})
-      actor.save()
-      actor2 = Actor.new({:name => "Brad Pitt", :id => nil})
-      actor2.save()
-      actor.delete()
-      expect(Actor.all()).to(eq([actor2]))
-    end
+  define_method(:update) do |attributes|
+    @name = attributes.fetch(:name, @name)
+    @id = self.id()
+    DB.exec("UPDATE actors SET name = '#{@name}' WHERE id = #{@id};")
+  end
+
+  define_method(:delete) do
+    DB.exec("DELETE FROM actors WHERE id = #{self.id()};")
   end
 end
